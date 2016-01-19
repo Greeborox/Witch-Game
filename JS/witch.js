@@ -13,7 +13,7 @@ function initAll(){
     this.assets = [];
     this.loadedAssets = 0;
     this.state = 'loadingState';
-    this.masterSprite
+    this.masterSprite;
     this.pressedKeys = {};
     // the sprite object template
     this.spriteObject = {
@@ -25,10 +25,6 @@ function initAll(){
       y: 0,
       width: 64,
       height: 64,
-      left: function(){return this.x;},
-      right: function(){return this.x + this.width;},
-      top: function(){return this.y;},
-      bottom: function(){return this.y + this.height;}
     };
     //methods
       //start
@@ -209,12 +205,8 @@ function initAll(){
         this.witch.x = 30;
         this.witch.y = self.canvas.height/2 - this.witch.height/2;
         this.witch.baseY = self.canvas.height/2 - this.witch.height/2;
-        this.witch.speed = 5;
+        this.witch.speed = 4;
         this.witch.velocity = {x:0,y:0};
-        this.witch.goingUp = false;
-        this.witch.goingDown = false;
-        this.witch.goingLeft = false;
-        this.witch.goingRight = false;
         this.witch.facing = 0;
         this.witch.angle = 0;
         this.witch.waveRange = 10;
@@ -282,8 +274,7 @@ function initAll(){
             this.witch.width*this.witch.facing,this.witch.sourceY,this.witch.sourceWidth,this.witch.sourceHeight,
             Math.floor(this.witch.x),Math.floor(this.witch.y),this.witch.width,this.witch.height);
           self.ctx.restore();
-
         }
       }
-    }
+    };
   }
