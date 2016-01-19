@@ -162,9 +162,23 @@ function initAll(){
       toLeave: false,
       nextState: "",
       mainEntities: [],
+      messages: [],
+      herbs: [],
       background: undefined,
       moonStars: undefined,
       witch: undefined,
+      witchHouse: undefined,
+      dandelion: undefined,
+      skullcap: undefined,
+      fern: undefined,
+      catnip: undefined,
+      message: {
+        x: self.canvas.width/2,
+        y: 50,
+        dispTime: 160,
+        displayedFor: 0,
+        text: "test message",
+      },
       gameWorld: {
         width:12000,
         height:600
@@ -183,6 +197,12 @@ function initAll(){
           return this.x + (this.width * 0.25);
         }
       },
+      witchHouse: {
+        x: 0,
+        y: 350,
+        width: 180,
+        height: 180,
+      },
       init: function(){
         this.initialised = true;
         console.log("initialised main game state");
@@ -199,6 +219,9 @@ function initAll(){
         this.moonStars.sourceHeight = 600;
         this.moonStars.width = 12000;
         this.moonStars.height = 600;
+
+        this.mainEntities.push(this.background);
+        this.mainEntities.push(this.moonStars);
         //witch obj
         this.witch = Object.create(self.spriteObject);
         this.witch.sourceY = 600,
@@ -210,18 +233,82 @@ function initAll(){
         this.witch.facing = 0;
         this.witch.angle = 0;
         this.witch.waveRange = 10;
+        this.witch.inHouse = false;
+        this.witch.herbsCollected = 0;
 
-        this.mainEntities.push(this.background);
-        this.mainEntities.push(this.moonStars);
+        //herbs
+        this.herb = Object.create(self.spriteObject);
+        this.herb.frames = 4;
+        this.herb.active = true;
+        this.herb.sourceWidth = 25;
+        this.herb.sourceHeight = 25;
+        this.herb.width = 25;
+        this.herb.height = 25;
+        this.herb.y = 480;
+
+        this.dandelion = Object.create(this.herb);
+        this.dandelion.x = 2500;
+        this.dandelion.name = "dandelion";
+
+        this.skullcap = Object.create(this.herb);
+        this.skullcap.x = 6000;
+        this.skullcap.name = "skullcap";
+
+        this.fern = Object.create(this.herb);
+        this.fern.x = 8780;
+        this.fern.name = "fern";
+
+        this.catnip = Object.create(this.herb);
+        this.catnip.x = 11400;
+        this.catnip.name = "catnip";
+
+        this.herbs.push(this.dandelion);
+        this.herbs.push(this.skullcap);
+        this.herbs.push(this.fern);
+        this.herbs.push(this.catnip);
+
+      },
+      checkCollision: function(obj1,obj2) {
+        return !(obj1.x + obj1.width < obj2.x ||
+                 obj2.x + obj2.width < obj1.x ||
+                 obj1.y + obj1.height < obj2.y ||
+                 obj2.y + obj2.height < obj1.y);
+      },
+      checkWitchAtHouse: function(){
+        if(this.witch.herbsCollected < 4) {
+          var newMsg = Object.create(this.message);
+          newMsg.text = "Go find the herbs! You need "+ String(4-this.witch.herbsCollected) +" more...";
+          this.messages.push(newMsg);
+        } else {
+          var newMsg = Object.create(this.message);
+          newMsg.text = "Congratulations! You have collected all the herbs!";
+          this.messages.push(newMsg);
+        }
+      },
+      collectHerb: function(herb){
+        this.witch.herbsCollected++;
+        var newMsg = Object.create(this.message);
+        newMsg.text = "You have found: "+herb.name;
+        this.messages.push(newMsg);
+        if(this.witch.herbsCollected < 4) {
+          var newMsg = Object.create(this.message);
+          newMsg.text = "You still need to finde "+ String(4-this.witch.herbsCollected) +" more herbs";
+          this.messages.push(newMsg);
+        } else {
+          var newMsg = Object.create(this.message);
+          newMsg.text = "You have all the herbs! Go back to your hut so you can prepare the Anti-Curse!";
+          this.messages.push(newMsg);
+        }
       },
       update: function(){
+        //update witch position
         this.witch.x += this.witch.velocity.x;
         this.witch.y = this.witch.baseY + Math.sin(this.witch.angle) * this.witch.waveRange;
         this.witch.angle += 0.1;
         if(this.witch.angle > Math.PI*2){
           this.witch.angle = 0;
         };
-
+        //read keays
         if(self.pressedKeys['37'] && !self.pressedKeys['39']) {
           this.witch.facing = 1;
           this.witch.velocity.x = -this.witch.speed;
@@ -239,40 +326,86 @@ function initAll(){
         if(self.pressedKeys['40'] && !self.pressedKeys['38']) {
           this.witch.baseY += this.witch.speed;
         }
-
+        //hold witch within game world
         this.witch.x = Math.max(0, Math.min(this.witch.x + this.witch.velocity.x, this.gameWorld.width - this.witch.width));
         this.witch.baseY = Math.max(this.witch.waveRange, Math.min(this.witch.baseY + this.witch.velocity.y, this.gameWorld.height - this.witch.height-this.witch.waveRange));
-
+        //move the screen if witch is in the scroll zones
         if(this.witch.x < this.screen.leftScrollZone()){
           this.screen.x = Math.floor(this.witch.x - (this.screen.width * 0.25));
         }
         if(this.witch.x + this.witch.width > this.screen.rightScrollZone()){
           this.screen.x = Math.floor(this.witch.x + this.witch.width - (this.screen.width * 0.75));
         }
-
+        //hold the screen within game world
         if(this.screen.x < 0)  {
           this.screen.x = 0;
         }
         if(this.screen.x + this.screen.width > this.gameWorld.width){
           this.screen.x = this.gameWorld.width - this.screen.width;
         }
-
+        //move the parallax background
         this.screen.speedX = this.screen.x - this.screen.prevX;
         this.moonStars.x += this.screen.speedX / 1.5;
         this.screen.prevX = this.screen.x;
+        //update messages
+        for(var i = 0; i < this.messages.length; i++){
+          var msg = this.messages[i];
+          msg.displayedFor++;
+          if(msg.displayedFor >= msg.dispTime){
+            this.messages.splice(i,1);
+          }
+        }
+
+        //check collisions
+        if(this.checkCollision(this.witch,this.witchHouse)){
+          if(!this.witch.inHouse) {
+            this.checkWitchAtHouse();
+            this.witch.inHouse = true;
+          }
+        } else {
+          this.witch.inHouse = false;
+        };
+
+        for(var i = 0; i < this.herbs.length; i++){
+          var herb = this.herbs[i];
+          if(this.checkCollision(this.witch,herb)){
+            if(herb.active){
+              this.collectHerb(herb);
+              herb.active = false;
+            }
+          }
+        }
+
       },
       draw: function(){
         self.ctx.clearRect(0,0,self.canvas.width,self.canvas.height);
         if(this.mainEntities.length !== 0){
           self.ctx.save();
           self.ctx.translate(-this.screen.x, -this.screen.y);
+          //draw backgrounds
           for (var i = 0; i < this.mainEntities.length; i++) {
             var entity = this.mainEntities[i];
             self.ctx.drawImage(self.masterSprite,entity.sourceX,entity.sourceY,entity.sourceWidth,entity.sourceHeight,Math.floor(entity.x),Math.floor(entity.y),entity.width,entity.height);
           }
+          //draw witch
           self.ctx.drawImage(self.masterSprite,
             this.witch.width*this.witch.facing,this.witch.sourceY,this.witch.sourceWidth,this.witch.sourceHeight,
             Math.floor(this.witch.x),Math.floor(this.witch.y),this.witch.width,this.witch.height);
+          //draw herbs
+          for(var i = 0; i < this.herbs.length; i++){
+            var herb = this.herbs[i]
+            if(herb.active){
+              self.ctx.fillStyle = '#F00';
+              self.ctx.fillRect(herb.x,herb.y,herb.width,herb.height);
+            }
+          }
+          //draw meassages
+          self.ctx.font="20px Arial";
+    			self.ctx.fillStyle = '#FFF';
+    			self.ctx.textAlign = "center";
+          for(var i = 0; i < this.messages.length; i++) {
+            self.ctx.fillText(this.messages[i].text,this.screen.x+this.messages[i].x,this.screen.y+this.messages[i].y+(25*i));
+          }
           self.ctx.restore();
         }
       }
