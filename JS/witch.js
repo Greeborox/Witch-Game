@@ -164,6 +164,7 @@ function initAll(){
       mainEntities: [],
       messages: [],
       herbs: [],
+      magicMissiles: [],
       background: undefined,
       moonStars: undefined,
       witch: undefined,
@@ -235,10 +236,14 @@ function initAll(){
         this.witch.waveRange = 10;
         this.witch.inHouse = false;
         this.witch.herbsCollected = 0;
+        this.witch.missileFired = false;
 
         //herbs
         this.herb = Object.create(self.spriteObject);
         this.herb.frames = 4;
+        this.herb.dispTime = 4;
+        this.herb.currFrame = 0;
+        this.herb.dispFor = 0;
         this.herb.active = true;
         this.herb.sourceWidth = 25;
         this.herb.sourceHeight = 25;
@@ -249,23 +254,41 @@ function initAll(){
         this.dandelion = Object.create(this.herb);
         this.dandelion.x = 2500;
         this.dandelion.name = "dandelion";
+        this.dandelion.sourceY = 1280;
 
         this.skullcap = Object.create(this.herb);
         this.skullcap.x = 6000;
         this.skullcap.name = "skullcap";
+        this.skullcap.sourceY = 1305;
 
         this.fern = Object.create(this.herb);
         this.fern.x = 8780;
         this.fern.name = "fern";
+        this.fern.sourceY = 1330;
 
         this.catnip = Object.create(this.herb);
         this.catnip.x = 11400;
         this.catnip.name = "catnip";
+        this.catnip.sourceY = 1355;
 
         this.herbs.push(this.dandelion);
         this.herbs.push(this.skullcap);
         this.herbs.push(this.fern);
         this.herbs.push(this.catnip);
+
+        // magic misslies
+        this.magicMissile = Object.create(self.spriteObject);
+        this.magicMissile.sourceY = 1270;
+        this.magicMissile.sourceWidth = 10;
+        this.magicMissile.sourceHeight = 10;
+        this.magicMissile.width = 10;
+        this.magicMissile.height = 10;
+        this.magicMissile.frames = 4;
+        this.magicMissile.dispTime = 4;
+        this.magicMissile.currFrame = 0;
+        this.magicMissile.dispFor = 0;
+        this.magicMissile.speed = 12;
+        this.magicMissile.velocity = 0;
 
       },
       checkCollision: function(obj1,obj2) {
@@ -283,6 +306,12 @@ function initAll(){
           var newMsg = Object.create(this.message);
           newMsg.text = "Congratulations! You have collected all the herbs!";
           this.messages.push(newMsg);
+          this.toLeave = true;
+          this.nextState = "gameWon";
+          this.mainEntities = [];
+          this.messages = [];
+          this.herbs = [];
+          this.magicMissiles = [];
         }
       },
       collectHerb: function(herb){
@@ -290,15 +319,26 @@ function initAll(){
         var newMsg = Object.create(this.message);
         newMsg.text = "You have found: "+herb.name;
         this.messages.push(newMsg);
-        if(this.witch.herbsCollected < 4) {
+        if(this.witch.herbsCollected < 3) {
           var newMsg = Object.create(this.message);
-          newMsg.text = "You still need to finde "+ String(4-this.witch.herbsCollected) +" more herbs";
+          newMsg.text = "You still need to find "+ String(4-this.witch.herbsCollected) +" more herbs";
+          this.messages.push(newMsg);
+        } else if(this.witch.herbsCollected === 3) {
+          var newMsg = Object.create(this.message);
+          newMsg.text = "Only one more herb to find!";
           this.messages.push(newMsg);
         } else {
           var newMsg = Object.create(this.message);
           newMsg.text = "You have all the herbs! Go back to your hut so you can prepare the Anti-Curse!";
           this.messages.push(newMsg);
         }
+      },
+      fireMissile: function(){
+        var newMissile = Object.create(this.magicMissile);
+        newMissile.x = this.witch.facing ? this.witch.x : this.witch.x+this.witch.width;
+        newMissile.y = this.witch.y + (this.witch.height/2) - (newMissile.width/2);
+        newMissile.velocity = this.witch.facing ? -1 : 1;
+        this.magicMissiles.push(newMissile);
       },
       update: function(){
         //update witch position
@@ -326,6 +366,16 @@ function initAll(){
         if(self.pressedKeys['40'] && !self.pressedKeys['38']) {
           this.witch.baseY += this.witch.speed;
         }
+
+        if(self.pressedKeys['32'] && !this.witch.missileFired) {
+          this.witch.missileFired = true;
+          this.fireMissile();
+        }
+
+        if(!self.pressedKeys['32']) {
+          this.witch.missileFired = false;
+        }
+
         //hold witch within game world
         this.witch.x = Math.max(0, Math.min(this.witch.x + this.witch.velocity.x, this.gameWorld.width - this.witch.width));
         this.witch.baseY = Math.max(this.witch.waveRange, Math.min(this.witch.baseY + this.witch.velocity.y, this.gameWorld.height - this.witch.height-this.witch.waveRange));
@@ -354,8 +404,37 @@ function initAll(){
           if(msg.displayedFor >= msg.dispTime){
             this.messages.splice(i,1);
           }
+        };
+        //updateHebs
+        for(var i = 0; i<this.herbs.length;i++){
+          var herb = this.herbs[i];
+          if(herb.dispFor > herb.dispTime){
+            herb.currFrame++;
+            if(herb.currFrame === herb.frames){
+              herb.currFrame = 0;
+            }
+            herb.dispFor = 0;
+          } else {
+            herb.dispFor++;
+          }
+        };
+        //update missiles
+        for(var i = 0; i < this.magicMissiles.length; i++){
+          var missile = this.magicMissiles[i];
+          if(missile.dispFor > missile.dispTime){
+            missile.currFrame++;
+            if(missile.currFrame === missile.frames){
+              missile.currFrame = 0;
+            }
+            missile.dispFor = 0;
+          } else {
+            missile.dispFor++;
+          }
+          missile.x += (missile.speed*missile.velocity);
+          if(missile.x < this.screen.x-100 || missile.x > this.screen.x+this.screen.width+100){
+            this.magicMissiles.splice(i,1);
+          }
         }
-
         //check collisions
         if(this.checkCollision(this.witch,this.witchHouse)){
           if(!this.witch.inHouse) {
@@ -395,9 +474,13 @@ function initAll(){
           for(var i = 0; i < this.herbs.length; i++){
             var herb = this.herbs[i]
             if(herb.active){
-              self.ctx.fillStyle = '#F00';
-              self.ctx.fillRect(herb.x,herb.y,herb.width,herb.height);
+              self.ctx.drawImage(self.masterSprite,(herb.currFrame*herb.sourceWidth),herb.sourceY,herb.sourceWidth,herb.sourceHeight,Math.floor(herb.x),Math.floor(herb.y),herb.width,herb.height);
             }
+          }
+          //draw missiles
+          for(var i = 0; i < this.magicMissiles.length; i++){
+            var missile = this.magicMissiles[i]
+            self.ctx.drawImage(self.masterSprite,(missile.currFrame*missile.sourceWidth),missile.sourceY,missile.sourceWidth,missile.sourceHeight,Math.floor(missile.x),Math.floor(missile.y),missile.width,missile.height);
           }
           //draw meassages
           self.ctx.font="20px Arial";
@@ -408,6 +491,28 @@ function initAll(){
           }
           self.ctx.restore();
         }
+      }
+    };
+    this.gameWon = {
+      initialised: false,
+      toLeave: false,
+      nextState: "",
+      init: function(){
+        this.initialised = true;
+        console.log("initialised gameWon");
+      },
+      update: function(){
+        if(self.pressedKeys[32]){
+          this.toLeave = true;
+          this.nextState = "menuState";
+        }
+      },
+      draw: function(){
+        self.ctx.clearRect(0,0,self.canvas.width,self.canvas.height)
+        self.ctx.font="20px Arial";
+  			self.ctx.fillStyle = '#000';
+  			self.ctx.textAlign = "left";
+        self.ctx.fillText("Congratularions! You have won the game!",20,self.canvas.height/2-20);
       }
     };
   }
