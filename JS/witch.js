@@ -25,6 +25,12 @@ function initAll(){
       y: 0,
       width: 64,
       height: 64,
+      centerY: function() {
+        return this.y + this.height/2
+      },
+      centerX: function() {
+        return this.x + this.width/2
+      },
     };
     //methods
       //start
@@ -169,6 +175,8 @@ function initAll(){
       magicMissiles: [],
       evilMissiles: [],
       creeps: [],
+      obstacles: [],
+      obstacleXs: [370, 800, 1180, 1350, 1520, 1896, 2160, 2800, 2970, 3240, 3510, 4050, 4320, 4590, 4860, 5130, 5400, 5670, 6200, 6680, 6750, 7020, 7830, 8150, 8470, 8910, 9180, 9720, 9990, 10260,  10800, 11140,],
       background: undefined,
       moonStars: undefined,
       witch: undefined,
@@ -196,10 +204,10 @@ function initAll(){
         speedX: 0,
         prevX: 0,
         rightScrollZone: function(){
-         return this.x + (this.width * 0.75);
+         return this.x + (this.width * 0.65);
         },
         leftScrollZone: function(){
-          return this.x + (this.width * 0.25);
+          return this.x + (this.width * 0.35);
         }
       },
       witchHouse: {
@@ -217,7 +225,8 @@ function initAll(){
         this.magicMissiles = [];
         this.evilMissiles = [];
         this.creeps = [];
-        this.creepSpawnRate = 80;
+        this.obstacles = [];
+        this.creepSpawnRate = 120;
         //background obj
         this.background = Object.create(self.spriteObject);
         this.background.sourceWidth = 12000;
@@ -236,13 +245,41 @@ function initAll(){
 
         this.mainEntities.push(this.background);
         this.mainEntities.push(this.moonStars);
+        //setting the obstacles
+
+        this.obstacle = Object.create(self.spriteObject);
+
+        this.oak = Object.create(this.obstacle);
+        this.oak.sourceY = 1700;
+        this.oak.sourceWidth = 162;
+        this.oak.sourceHeight = 212;
+        this.oak.width = 70;
+        this.oak.height = 212;
+
+        this.fir = Object.create(this.obstacle);
+        this.fir.sourceX = 162;
+        this.fir.sourceY = 1700;
+        this.fir.sourceWidth = 162;
+        this.fir.sourceHeight = 212;
+        this.fir.width = 70;
+        this.fir.height = 212;
+
+        this.stone = Object.create(this.obstacle);
+        this.stone.sourceY = 1912;
+        this.stone.sourceWidth = 71;
+        this.stone.sourceHeight = 51;
+        this.stone.width = 71;
+        this.stone.height = 51;
+
+        this.populateObstacles();
+
         //witch obj
         this.witch = Object.create(self.spriteObject);
         this.witch.sourceY = 600,
         this.witch.x = 30;
         this.witch.y = self.canvas.height/2 - this.witch.height/2;
         this.witch.baseY = self.canvas.height/2 - this.witch.height/2;
-        this.witch.speed = 4;
+        this.witch.speed = 3;
         this.witch.velocity = {x:0,y:0};
         this.witch.facing = 0;
         this.witch.angle = 0;
@@ -307,7 +344,7 @@ function initAll(){
         this.creep.dispFor = 0;
         this.creep.speed = 6;
         this.creep.shotDown = false;
-        this.creep.shootRate = 90;
+        this.creep.shootRate = 135;
         this.creep.lastShoot = 0;
 
         // magic misslies
@@ -328,6 +365,34 @@ function initAll(){
         this.evilMissile.sourceX = 60;
         this.evilMissile.angle = 0;
         this.evilMissile.speed = 6;
+      },
+      populateObstacles(){
+        for(var i = 0;i<this.obstacleXs.length;i++){
+          var randomObstacle = Math.floor(Math.random()*3);
+          var randomObstacleYmod = Math.floor(Math.random()*11-(-10)+(-10));
+          var obstacle;
+          switch(randomObstacle){
+            case 0:
+              obstacle = Object.create(this.oak);
+              obstacle.x = Math.floor(this.obstacleXs[i]+((obstacle.sourceWidth-obstacle.width)/2));
+              obstacle.drawX = this.obstacleXs[i];
+              obstacle.y = 320 + randomObstacleYmod;
+              break;
+            case 1:
+              obstacle = Object.create(this.fir);
+              obstacle.x = Math.floor(this.obstacleXs[i]+((obstacle.sourceWidth-obstacle.width)/2));
+              obstacle.drawX = this.obstacleXs[i];
+              obstacle.y = 320 + randomObstacleYmod;
+              break;
+            case 2:
+              obstacle = Object.create(this.stone);
+              obstacle.x = this.obstacleXs[i];
+              obstacle.drawX = this.obstacleXs[i];
+              obstacle.y = 460 + randomObstacleYmod;
+              break;
+          }
+          this.obstacles.push(obstacle);
+        }
       },
       spawnCreep: function(){
         var creep = Object.create(this.creep);
@@ -405,7 +470,6 @@ function initAll(){
             creep.sourceY = 1572;
             creep.shooter = true;
             creep.update = function() {
-
             };
             break;
         }
@@ -415,6 +479,32 @@ function initAll(){
                  obj2.x + obj2.width < obj1.x ||
                  obj1.y + obj1.height < obj2.y ||
                  obj2.y + obj2.height < obj1.y);
+      },
+      blockRectangle: function(r1, r2) {
+        var collisionSide = "";
+        var vx = r1.centerX() - r2.centerX();
+        var vy = r1.centerY() - r2.centerY();
+        var combinedHalfWidths = r1.width/2 + r2.width/2;
+        var combinedHalfHeights = r1.height/2 + r2.height/2;
+        if(Math.abs(vx) < combinedHalfWidths){
+          if(Math.abs(vy) < combinedHalfHeights){
+            var overlapX = combinedHalfWidths - Math.abs(vx);
+            var overlapY = combinedHalfHeights - Math.abs(vy);
+            if(overlapX >= overlapY) {
+              if(vy > 0) {
+                r1.y = r1.y + overlapY;
+              } else {
+                r1.y = r1.y - overlapY;
+              }
+            } else {
+              if(vx > 0) {
+                r1.x = r1.x + overlapX;
+              } else {
+                r1.x = r1.x - overlapX;
+              }
+            }
+          }
+        }
       },
       checkWitchAtHouse: function(){
         if(this.witch.herbsCollected < 4) {
@@ -516,10 +606,10 @@ function initAll(){
         this.witch.baseY = Math.max(this.witch.waveRange, Math.min(this.witch.baseY + this.witch.velocity.y, this.gameWorld.height - this.witch.height-this.witch.waveRange));
         //move the screen if witch is in the scroll zones
         if(this.witch.x < this.screen.leftScrollZone()){
-          this.screen.x = Math.floor(this.witch.x - (this.screen.width * 0.25));
+          this.screen.x = Math.floor(this.witch.x - (this.screen.width * 0.35));
         }
         if(this.witch.x + this.witch.width > this.screen.rightScrollZone()){
-          this.screen.x = Math.floor(this.witch.x + this.witch.width - (this.screen.width * 0.75));
+          this.screen.x = Math.floor(this.witch.x + this.witch.width - (this.screen.width * 0.65));
         }
         //hold the screen within game world
         if(this.screen.x < 0)  {
@@ -649,6 +739,10 @@ function initAll(){
           this.witch.inHouse = false;
         };
 
+        for(var i = 0; i<this.obstacles.length; i++){
+          this.blockRectangle(this.witch,this.obstacles[i]);
+        }
+
         for(var i = 0;i<this.creeps.length;i++){
           var creep = this.creeps[i];
           if(!creep.spawning && !creep.shotDown && this.checkCollision(this.witch,creep)){
@@ -706,6 +800,11 @@ function initAll(){
           for (var i = 0; i < this.mainEntities.length; i++) {
             var entity = this.mainEntities[i];
             self.ctx.drawImage(self.masterSprite,entity.sourceX,entity.sourceY,entity.sourceWidth,entity.sourceHeight,Math.floor(entity.x),Math.floor(entity.y),entity.width,entity.height);
+          }
+          //draw obstacles
+          for (var i = 0; i < this.obstacles.length; i++) {
+            var obstacle = this.obstacles[i];
+            self.ctx.drawImage(self.masterSprite,obstacle.sourceX,obstacle.sourceY,obstacle.sourceWidth,obstacle.sourceHeight,Math.floor(obstacle.drawX),Math.floor(obstacle.y),obstacle.sourceWidth,obstacle.sourceHeight);
           }
           //draw witch
           self.ctx.drawImage(self.masterSprite,
