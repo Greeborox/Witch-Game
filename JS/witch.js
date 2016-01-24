@@ -161,10 +161,14 @@ function initAll(){
       initialised: false,
       toLeave: false,
       nextState: "",
+      creepSpawnRate: 80,
+      lastCreep: 25,
       mainEntities: [],
       messages: [],
       herbs: [],
       magicMissiles: [],
+      evilMissiles: [],
+      creeps: [],
       background: undefined,
       moonStars: undefined,
       witch: undefined,
@@ -207,6 +211,13 @@ function initAll(){
       init: function(){
         this.initialised = true;
         console.log("initialised main game state");
+        this.mainEntities = [];
+        this.messages = [];
+        this.herbs = [];
+        this.magicMissiles = [];
+        this.evilMissiles = [];
+        this.creeps = [];
+        this.creepSpawnRate = 80;
         //background obj
         this.background = Object.create(self.spriteObject);
         this.background.sourceWidth = 12000;
@@ -220,6 +231,8 @@ function initAll(){
         this.moonStars.sourceHeight = 600;
         this.moonStars.width = 12000;
         this.moonStars.height = 600;
+        //set the screen to beginnign
+        this.screen.x = 0;
 
         this.mainEntities.push(this.background);
         this.mainEntities.push(this.moonStars);
@@ -237,6 +250,10 @@ function initAll(){
         this.witch.inHouse = false;
         this.witch.herbsCollected = 0;
         this.witch.missileFired = false;
+        this.witch.lifePoints = 100;
+        this.witch.recovering = false;
+        this.witch.recoverTime = 90;
+        this.witch.recoveredFor = 0;
 
         //herbs
         this.herb = Object.create(self.spriteObject);
@@ -276,6 +293,23 @@ function initAll(){
         this.herbs.push(this.fern);
         this.herbs.push(this.catnip);
 
+        //monsters
+        this.creep = Object.create(self.spriteObject);
+        this.creep.sourceY = 1636;
+        this.creep.spawning = true;
+        this.creep.spawnTime = 40;
+        this.creep.spawningFor = 0;
+        this.creep.type = undefined;
+        this.creep.shooter = false;
+        this.creep.frames = 11;
+        this.creep.currFrame = 0;
+        this.creep.dispTime = 2;
+        this.creep.dispFor = 0;
+        this.creep.speed = 6;
+        this.creep.shotDown = false;
+        this.creep.shootRate = 90;
+        this.creep.lastShoot = 0;
+
         // magic misslies
         this.magicMissile = Object.create(self.spriteObject);
         this.magicMissile.sourceY = 1270;
@@ -290,6 +324,91 @@ function initAll(){
         this.magicMissile.speed = 12;
         this.magicMissile.velocity = 0;
 
+        this.evilMissile = Object.create(this.magicMissile);
+        this.evilMissile.sourceX = 60;
+        this.evilMissile.angle = 0;
+        this.evilMissile.speed = 6;
+      },
+      spawnCreep: function(){
+        var creep = Object.create(this.creep);
+        creep.x = Math.floor(Math.random()*((this.screen.x+this.screen.width)-this.screen.x)+this.screen.x);
+        creep.y = Math.floor(Math.random()*(self.canvas.height-150));
+        this.creeps.push(creep);
+      },
+      chooseCreep: function(creep,screen){
+        var randomCreepNum = Math.floor(Math.random()*4);
+        switch(randomCreepNum){
+          case 0:
+            creep.type = "demonSkull";
+            creep.frames = 10;
+            creep.sourceY = 1380;
+            creep.shooter = true;
+            creep.dispTime = 4;
+            creep.update = function() {
+              this.x += this.speed;
+              if(this.x+this.width >= screen.x+screen.width){
+                this.speed = -this.speed;
+              }
+              if(this.speed < 0 && this.x <= screen.x) {
+                this.speed = -this.speed;
+              }
+            };
+            break;
+          case 1:
+            creep.type = "ghost";
+            creep.frames = 4;
+            creep.sourceY = 1444;
+            creep.dispTime = 4;
+            creep.update = function() {
+              this.y += this.speed;
+              if(this.y+this.height >= screen.height){
+                this.speed = -this.speed;
+              }
+              if(this.speed < 0 && this.y <= 0) {
+                this.speed = -this.speed;
+              }
+            };
+            break;
+          case 2:
+            creep.type = "hellBat";
+            creep.frames = 4;
+            creep.sourceY = 1508;
+            creep.baseY = creep.y;
+            creep.angle = 0;
+            creep.waveRange = 150;
+            creep.dispTime = 4;
+            creep.update = function() {
+              this.x += this.speed;
+              if(this.x+this.width >= screen.x+screen.width){
+                this.speed = -this.speed;
+              }
+              if(this.speed < 0 && this.x <= screen.x) {
+                this.speed = -this.speed;
+              }
+              this.y = this.baseY + Math.sin(this.angle) * this.waveRange;
+              this.angle += 0.01;
+              if(this.angle > Math.PI*2){
+                this.angle = 0;
+              };
+              if(this.y<=0){
+                this.y = 0;
+              }
+              if(this.y+this.height>=screen.height){
+                this.y=screen.height;
+              }
+            };
+            break;
+          case 3:
+            creep.type = "evilEye";
+            creep.frames = 4;
+            creep.dispTime = 8;
+            creep.sourceY = 1572;
+            creep.shooter = true;
+            creep.update = function() {
+
+            };
+            break;
+        }
       },
       checkCollision: function(obj1,obj2) {
         return !(obj1.x + obj1.width < obj2.x ||
@@ -303,15 +422,8 @@ function initAll(){
           newMsg.text = "Go find the herbs! You need "+ String(4-this.witch.herbsCollected) +" more...";
           this.messages.push(newMsg);
         } else {
-          var newMsg = Object.create(this.message);
-          newMsg.text = "Congratulations! You have collected all the herbs!";
-          this.messages.push(newMsg);
           this.toLeave = true;
           this.nextState = "gameWon";
-          this.mainEntities = [];
-          this.messages = [];
-          this.herbs = [];
-          this.magicMissiles = [];
         }
       },
       collectHerb: function(herb){
@@ -340,6 +452,14 @@ function initAll(){
         newMissile.velocity = this.witch.facing ? -1 : 1;
         this.magicMissiles.push(newMissile);
       },
+      castEvilMissile: function(creep,witch){
+        var missile = Object.create(this.evilMissile);
+        missile.x = creep.x+(creep.width/2);
+        missile.y = creep.y+(creep.height/2);
+        missile.angle = Math.atan2(witch.y-creep.y,witch.x-creep.x);
+        this.evilMissiles.push(missile);
+        //console.log(missile.angle);
+      },
       update: function(){
         //update witch position
         this.witch.x += this.witch.velocity.x;
@@ -348,6 +468,21 @@ function initAll(){
         if(this.witch.angle > Math.PI*2){
           this.witch.angle = 0;
         };
+        //update witch recovery
+        if(this.witch.recovering){
+          if(this.witch.recoveredFor >= this.witch.recoverTime){
+            this.witch.recovering = false;
+            this.witch.sourceY = 600;
+            this.witch.recoveredFor = 0;
+          } else {
+            if(this.witch.recoveredFor%10 === 0 && this.witch.sourceY === 600){
+              this.witch.sourceY = 9000000;
+            } else if(this.witch.recoveredFor%10 === 0 && this.witch.sourceY !== 600){
+              this.witch.sourceY = 600;
+            }
+            this.witch.recoveredFor++;
+          }
+        }
         //read keays
         if(self.pressedKeys['37'] && !self.pressedKeys['39']) {
           this.witch.facing = 1;
@@ -397,6 +532,57 @@ function initAll(){
         this.screen.speedX = this.screen.x - this.screen.prevX;
         this.moonStars.x += this.screen.speedX / 1.5;
         this.screen.prevX = this.screen.x;
+        //check if its creep spawn time
+        if(this.creeps.length < 15) {
+          if(this.lastCreep >= this.creepSpawnRate){
+            this.spawnCreep();
+            this.lastCreep = 0;
+          } else {
+            this.lastCreep++;
+          }
+        }
+        //updateCreeps
+        for(var i = 0; i<this.creeps.length;i++){
+          var creep = this.creeps[i];
+          if(creep.dispFor > creep.dispTime){
+            creep.currFrame++;
+            if(creep.currFrame >= creep.frames){
+              creep.currFrame = 0;
+            }
+            creep.dispFor = 0;
+          } else {
+            creep.dispFor++;
+          }
+          if(creep.x<this.screen.x-100 || creep.x>this.screen.x+this.screen.width+100){
+            this.creeps.splice(i,1);
+          }
+          if(creep.spawning && creep.spawningFor >= creep.spawnTime){
+            creep.spawning = false;
+            this.chooseCreep(creep,this.screen);
+          } else {
+            creep.spawningFor++;
+          }
+          if(!creep.spawning){
+            creep.update();
+          }
+          if(creep.shooter && creep.lastShoot >= creep.shootRate){
+            this.castEvilMissile(creep,this.witch);
+            creep.lastShoot = 0;
+          } else {
+            creep.lastShoot++;
+          }
+          if(creep.shotDown && creep.type !== "dead"){
+            creep.type = "dead";
+            creep.speed = 0;
+            creep.sourceY = 1636;
+            creep.sourceX = 384;
+            creep.currFrame = 6;
+            creep.frames = 12;
+          }
+          if(creep.type === "dead" && creep.currFrame === 10){
+            this.creeps.splice(i,1)
+          }
+        };
         //update messages
         for(var i = 0; i < this.messages.length; i++){
           var msg = this.messages[i];
@@ -435,6 +621,24 @@ function initAll(){
             this.magicMissiles.splice(i,1);
           }
         }
+        //update evil missiles
+        for(var i = 0; i < this.evilMissiles.length; i++){
+          var missile = this.evilMissiles[i];
+          if(missile.dispFor > missile.dispTime){
+            missile.currFrame++;
+            if(missile.currFrame === missile.frames){
+              missile.currFrame = 0;
+            }
+            missile.dispFor = 0;
+          } else {
+            missile.dispFor++;
+          }
+          missile.x += Math.cos(missile.angle) * missile.speed;
+          missile.y += Math.sin(missile.angle) * missile.speed;
+          if(missile.x < this.screen.x-500 || missile.x > this.screen.x+this.screen.width+500){
+            this.evilMissiles.splice(i,1);
+          }
+        }
         //check collisions
         if(this.checkCollision(this.witch,this.witchHouse)){
           if(!this.witch.inHouse) {
@@ -445,16 +649,53 @@ function initAll(){
           this.witch.inHouse = false;
         };
 
+        for(var i = 0;i<this.creeps.length;i++){
+          var creep = this.creeps[i];
+          if(!creep.spawning && !creep.shotDown && this.checkCollision(this.witch,creep)){
+            creep.shotDown = true;
+            if(!this.witch.recovering){
+              this.witch.lifePoints -= 10;
+              this.witch.recovering = true;
+            }
+          }
+        }
+
+        for(var i = 0;i<this.evilMissiles.length;i++){
+          var missile = this.evilMissiles[i];
+          if(this.checkCollision(this.witch,missile)){
+            this.evilMissiles.splice(i,1);
+            if(!this.witch.recovering){
+              this.witch.lifePoints -= 10;
+              this.witch.recovering = true;
+            }
+          }
+        }
+
         for(var i = 0; i < this.herbs.length; i++){
           var herb = this.herbs[i];
           if(this.checkCollision(this.witch,herb)){
             if(herb.active){
               this.collectHerb(herb);
               herb.active = false;
+              this.creepSpawnRate -= 15;
+            }
+          }
+        };
+        for(var i = 0; i < this.magicMissiles.length; i++){
+          var missile = this.magicMissiles[i];
+          for(var j = 0; j < this.creeps.length; j++){
+            var creep = this.creeps[j];
+            if(!creep.spawning && this.checkCollision(missile,creep)){
+              this.magicMissiles.splice(i,1);
+              creep.shotDown = true;
             }
           }
         }
-
+        //check if witch is still alive
+        if(this.witch.lifePoints <= 0) {
+          this.toLeave = true;
+          this.nextState = "gameLost";
+        }
       },
       draw: function(){
         self.ctx.clearRect(0,0,self.canvas.width,self.canvas.height);
@@ -482,6 +723,15 @@ function initAll(){
             var missile = this.magicMissiles[i]
             self.ctx.drawImage(self.masterSprite,(missile.currFrame*missile.sourceWidth),missile.sourceY,missile.sourceWidth,missile.sourceHeight,Math.floor(missile.x),Math.floor(missile.y),missile.width,missile.height);
           }
+          for(var i = 0; i < this.evilMissiles.length; i++){
+            var missile = this.evilMissiles[i]
+            self.ctx.drawImage(self.masterSprite,(missile.sourceX+(missile.currFrame*missile.sourceWidth)),missile.sourceY,missile.sourceWidth,missile.sourceHeight,Math.floor(missile.x),Math.floor(missile.y),missile.width,missile.height);
+          }
+          //draw creeps
+          for(var i = 0; i < this.creeps.length; i++){
+            var creep = this.creeps[i]
+              self.ctx.drawImage(self.masterSprite,(creep.currFrame*creep.sourceWidth),creep.sourceY,creep.sourceWidth,creep.sourceHeight,Math.floor(creep.x),Math.floor(creep.y),creep.width,creep.height);
+          }
           //draw meassages
           self.ctx.font="20px Arial";
     			self.ctx.fillStyle = '#FFF';
@@ -489,6 +739,9 @@ function initAll(){
           for(var i = 0; i < this.messages.length; i++) {
             self.ctx.fillText(this.messages[i].text,this.screen.x+this.messages[i].x,this.screen.y+this.messages[i].y+(25*i));
           }
+          //draw LP's
+          self.ctx.textAlign = "left";
+          self.ctx.fillText(this.witch.lifePoints,this.screen.x+10,30);
           self.ctx.restore();
         }
       }
@@ -513,6 +766,28 @@ function initAll(){
   			self.ctx.fillStyle = '#000';
   			self.ctx.textAlign = "left";
         self.ctx.fillText("Congratularions! You have won the game!",20,self.canvas.height/2-20);
+      }
+    };
+    this.gameLost = {
+      initialised: false,
+      toLeave: false,
+      nextState: "",
+      init: function(){
+        this.initialised = true;
+        console.log("initialised gameLost");
+      },
+      update: function(){
+        if(self.pressedKeys[32]){
+          this.toLeave = true;
+          this.nextState = "menuState";
+        }
+      },
+      draw: function(){
+        self.ctx.clearRect(0,0,self.canvas.width,self.canvas.height)
+        self.ctx.font="20px Arial";
+  			self.ctx.fillStyle = '#000';
+  			self.ctx.textAlign = "left";
+        self.ctx.fillText("Oh no! The witch has been killed! You have lost the game!",20,self.canvas.height/2-20);
       }
     };
   }
