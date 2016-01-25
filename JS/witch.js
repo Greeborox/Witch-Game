@@ -366,7 +366,7 @@ function initAll(){
         this.evilMissile.angle = 0;
         this.evilMissile.speed = 6;
       },
-      populateObstacles(){
+      populateObstacles: function(){
         for(var i = 0;i<this.obstacleXs.length;i++){
           var randomObstacle = Math.floor(Math.random()*3);
           var randomObstacleYmod = Math.floor(Math.random()*11-(-10)+(-10));
